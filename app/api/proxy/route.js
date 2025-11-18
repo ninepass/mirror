@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import puppeteer from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 function checkAuth(request) {
   const auth = request.headers.get('authorization')
   if (!auth) return false
@@ -25,10 +28,11 @@ async function getChromePath() {
       return await chromium.executablePath()
     } catch (e) {
       console.error('Chromium binary not found:', e)
+      throw e
     }
   }
   
-  // Fallback to common Chrome locations
+  // Fallback to common Chrome locations (local development only)
   const { platform } = process
   const paths = {
     darwin: [
@@ -46,10 +50,17 @@ async function getChromePath() {
     ]
   }
   
-  const fs = require('fs')
-  for (const path of paths[platform] || paths.linux) {
-    if (fs.existsSync(path)) {
-      return path
+  // Only use fs in Node.js environment
+  if (typeof require !== 'undefined') {
+    try {
+      const fs = require('fs')
+      for (const path of paths[platform] || paths.linux) {
+        if (fs.existsSync(path)) {
+          return path
+        }
+      }
+    } catch (e) {
+      // fs not available in edge runtime
     }
   }
   
