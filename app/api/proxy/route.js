@@ -13,28 +13,62 @@ function checkAuth(request) {
   return username === process.env.AUTH_USERNAME && password === process.env.AUTH_PASSWORD
 }
 
-async function fetchPage(targetUrl) {
-  const isDev = process.env.NODE_ENV !== 'production'
+async function getChromePath() {
+  // Priority: Environment variable > Vercel Chromium > Local Chrome
+  if (process.env.CHROME_PATH) {
+    return process.env.CHROME_PATH
+  }
   
-  let executablePath
-  let args = ['--no-sandbox', '--disable-setuid-sandbox']
-  
-  if (isDev) {
-    executablePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-  } else {
+  // Try Vercel/Lambda Chromium
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
     try {
-      executablePath = await chromium.executablePath()
-      args = chromium.args
+      return await chromium.executablePath()
     } catch (e) {
-      executablePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+      console.error('Chromium binary not found:', e)
     }
   }
   
+  // Fallback to common Chrome locations
+  const { platform } = process
+  const paths = {
+    darwin: [
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium'
+    ],
+    win32: [
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
+    ],
+    linux: [
+      '/usr/bin/google-chrome',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/chromium'
+    ]
+  }
+  
+  const fs = require('fs')
+  for (const path of paths[platform] || paths.linux) {
+    if (fs.existsSync(path)) {
+      return path
+    }
+  }
+  
+  throw new Error('Chrome executable not found. Please set CHROME_PATH environment variable.')
+}
+
+async function fetchPage(targetUrl) {
+  const executablePath = await getChromePath()
+  const isVercel = process.env.VERCEL === '1'
+  
   const browser = await puppeteer.launch({
-    args,
+    args: isVercel ? chromium.args : [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu'
+    ],
     executablePath,
-    headless: true,
-    ignoreDefaultArgs: ['--disable-extensions']
+    headless: true
   })
 
   const page = await browser.newPage()

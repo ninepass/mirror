@@ -9,14 +9,24 @@ export async function GET(request) {
   }
 
   try {
-    const response = await fetch(url)
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    })
+    
+    if (!response.ok) {
+      return NextResponse.json({ error: `Failed to fetch: ${response.status}` }, { status: response.status })
+    }
+    
     const contentType = response.headers.get('content-type')
     const buffer = await response.arrayBuffer()
     
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': contentType || 'application/octet-stream',
-        'Cache-Control': 'public, max-age=31536000'
+        'Cache-Control': 'public, max-age=31536000',
+        'Access-Control-Allow-Origin': '*'
       }
     })
   } catch (error) {
