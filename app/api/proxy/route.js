@@ -72,14 +72,23 @@ async function fetchPage(targetUrl) {
   const isVercel = process.env.VERCEL === '1'
   
   const browser = await puppeteer.launch({
-    args: isVercel ? chromium.args : [
+    args: isVercel ? [
+      ...chromium.args,
+      '--disable-gpu',
+      '--disable-dev-shm-usage',
+      '--disable-setuid-sandbox',
+      '--no-first-run',
+      '--no-sandbox',
+      '--no-zygote',
+      '--single-process'
+    ] : [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu'
     ],
     executablePath,
-    headless: true
+    headless: isVercel ? chromium.headless : true
   })
 
   const page = await browser.newPage()
